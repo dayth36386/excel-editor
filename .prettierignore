@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+package-lock.json
+public
+# shadcn-vue components, kept as the CLI generates them
+src/components/ui
