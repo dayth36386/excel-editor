@@ -12,6 +12,7 @@ import {
   FileUpIcon,
   FolderOpenIcon,
   Grid3x3Icon,
+  HeartIcon,
   LayersIcon,
   MonitorIcon,
   MoonIcon,
@@ -52,6 +53,7 @@ import { SheetNameError, useWorkbook, type SaveResult } from '@/composables/useW
 import { LOCALES, setLocale, type Locale } from '@/i18n'
 import { canSaveAs, canWriteBack, fileFromDrop, pickExcelFile, WritePermissionError } from '@/lib/fileAccess'
 import { cn } from '@/lib/utils'
+import { AUTHOR_NAME, AUTHOR_URL, REPO_URL } from '@/lib/about'
 
 const { t, locale } = useI18n()
 const book = useWorkbook()
@@ -327,7 +329,7 @@ onBeforeUnmount(() => {
             </span>
             <span class="hidden font-semibold tracking-tight sm:inline">{{ t('app.name') }}</span>
             <a
-              href="https://github.com/dayth36386/excel-editor/releases"
+              :href="`${REPO_URL}/releases`"
               target="_blank"
               rel="noopener"
               class="hidden rounded-md border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors hover:text-foreground md:inline"
@@ -662,6 +664,47 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </main>
+
+      <footer class="border-t text-muted-foreground">
+        <div
+          class="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-5 text-xs sm:px-6"
+        >
+          <i18n-t keypath="footer.madeBy" tag="p" class="flex flex-wrap items-center gap-1">
+            <template #heart><HeartIcon class="size-3.5 fill-rose-500 text-rose-500" aria-label="love" /></template>
+            <template #name>
+              <a
+                :href="AUTHOR_URL"
+                target="_blank"
+                rel="noopener"
+                class="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {{ AUTHOR_NAME }}
+              </a>
+            </template>
+          </i18n-t>
+          <nav class="flex items-center gap-4">
+            <a :href="REPO_URL" target="_blank" rel="noopener" class="transition-colors hover:text-foreground">
+              {{ t('footer.source') }}
+            </a>
+            <a
+              :href="`${REPO_URL}/blob/main/LICENSE`"
+              target="_blank"
+              rel="noopener"
+              class="transition-colors hover:text-foreground"
+            >
+              {{ t('footer.license') }}
+            </a>
+            <a
+              :href="`${REPO_URL}/releases`"
+              target="_blank"
+              rel="noopener"
+              class="font-mono transition-colors hover:text-foreground"
+            >
+              v{{ version }}
+            </a>
+          </nav>
+        </div>
+      </footer>
 
       <input ref="fileInput" type="file" accept=".xlsx" hidden @change="onFileInput" />
 

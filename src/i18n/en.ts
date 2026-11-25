@@ -66,6 +66,11 @@ export default {
     clear: 'Clear contents',
     formulaPlaceholder: 'Select a cell and type, or enter a formula like =SUM(A1:A10)',
   },
+  footer: {
+    madeBy: 'Made with {heart} by {name}',
+    source: 'Source on GitHub',
+    license: 'MIT License',
+  },
   dropOverlay: 'Drop the .xlsx file to open it',
   stats: {
     rows: 'Rows',

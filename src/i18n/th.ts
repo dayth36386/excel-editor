@@ -66,6 +66,11 @@ const th: typeof en = {
     clear: 'ล้างข้อมูลในเซลล์',
     formulaPlaceholder: 'เลือกเซลล์แล้วพิมพ์ หรือใส่สูตร เช่น =SUM(A1:A10)',
   },
+  footer: {
+    madeBy: 'พัฒนาด้วย {heart} โดย {name}',
+    source: 'ซอร์สโค้ดบน GitHub',
+    license: 'สัญญาอนุญาต MIT',
+  },
   dropOverlay: 'วางไฟล์ .xlsx เพื่อเปิด',
   stats: {
     rows: 'แถว',
