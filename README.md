@@ -13,6 +13,10 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38bdf8?logo=tailwindcss&logoColor=white)
 ![shadcn-vue](https://img.shields.io/badge/shadcn--vue-reka--ui-000?logo=shadcnui&logoColor=white)
 
+### [▶ Live demo: excel-editor-two.vercel.app](https://excel-editor-two.vercel.app/)
+
+Open your own `.xlsx` or click **Try a sample file**. Everything runs in your browser and files are never uploaded.
+
 </div>
 
 ![Table view](docs/screenshots/table-view.png)
@@ -44,6 +48,8 @@
 </details>
 
 ## Getting started
+
+No install needed to try it: **https://excel-editor-two.vercel.app/**. To run it locally:
 
 Requires Node.js 20.19+ or 22.12+.
 
@@ -118,7 +124,7 @@ src/
 
 ## Deployment
 
-The app is fully static (`npm run build` → `dist/`), so it can be hosted anywhere. This repo deploys to **Vercel** through GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)):
+The app is fully static (`npm run build` → `dist/`), so it can be hosted anywhere. The live demo at https://excel-editor-two.vercel.app/ is deployed from `main`. This repo deploys to **Vercel** through GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)):
 
 1. Every push and pull request runs `npm run check`.
 2. On `main`, [semantic-release](https://semantic-release.gitbook.io) reads the commit messages, tags a new version and publishes a GitHub Release. The version is shown next to the app name.

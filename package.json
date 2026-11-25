@@ -5,6 +5,7 @@
   "description": "Edit Excel (.xlsx) files in the browser as a data table or a spreadsheet, and save them back with formatting intact.",
   "license": "MIT",
   "author": "Dechawiwatwong Detchang (https://github.com/dayth36386)",
+  "homepage": "https://excel-editor-two.vercel.app/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dayth36386/excel-editor.git"
