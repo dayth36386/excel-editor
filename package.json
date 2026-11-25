@@ -2,6 +2,16 @@
   "name": "excel-editor",
   "private": true,
   "version": "0.1.0",
+  "description": "Edit Excel (.xlsx) files in the browser as a data table or a spreadsheet, and save them back with formatting intact.",
+  "license": "MIT",
+  "author": "Dechawiwatwong Detchang (https://github.com/dayth36386)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dayth36386/excel-editor.git"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

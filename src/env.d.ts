@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** App version from package.json, injected by Vite. */
+declare const __APP_VERSION__: string
+
 // File System Access API (Chrome/Edge). Not in TypeScript's DOM lib yet.
 interface FilePickerAcceptType {
   description?: string

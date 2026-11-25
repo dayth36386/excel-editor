@@ -1,0 +1,89 @@
+name: CI & Deploy to Vercel
+
+# Checks every push and pull request, then builds and uploads the prebuilt output to Vercel.
+#   main          → version tag + GitHub Release (semantic-release), then a production deploy
+#   pull requests → preview deploy (URL in the job summary)
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN        https://vercel.com/account/tokens
+#   VERCEL_ORG_ID       "orgId" in .vercel/project.json after `npx vercel link`
+#   VERCEL_PROJECT_ID   "projectId" in .vercel/project.json after `npx vercel link`
+# Vercel's own Git deployments are turned off in vercel.json, so only this workflow deploys.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: 0 # no git hooks in CI
+
+jobs:
+  check:
+    name: Type-check, lint, format, test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check
+
+  deploy:
+    name: Deploy
+    needs: check
+    # Pull requests from forks don't get the secrets, so they can't deploy previews.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # semantic-release pushes the vX.Y.Z tag and creates the GitHub Release
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      PROD_FLAG: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so semantic-release can work out the next version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # feat: → x.1.0, fix:/perf: → x.x.1, "feat!:" or BREAKING CHANGE → 2.0.0. Other types (docs:, chore:…) don't release.
+      # The build reads the latest vX.Y.Z tag (vite.config.ts), so the app shows the right version even on
+      # pushes that don't release anything.
+      - name: Release (version tag + GitHub Release)
+        if: github.ref == 'refs/heads/main'
+        run: npx --yes semantic-release@25.0.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=$VERCEL_ENV --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build $PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt $PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $url" >> "$GITHUB_STEP_SUMMARY"

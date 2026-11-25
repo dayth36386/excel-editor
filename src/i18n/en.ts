@@ -3,6 +3,7 @@
 export default {
   app: {
     name: 'Excel Editor',
+    releases: 'Release notes on GitHub',
     title: 'Excel Editor — edit .xlsx files as a table',
   },
   header: {

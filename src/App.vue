@@ -101,6 +101,7 @@ const themeIcon = computed(() =>
 )
 
 const mod = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
+const version = __APP_VERSION__
 const sheetName = computed(() => sheets.value.find((s) => s.id === activeId.value)?.name ?? '')
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const defaultHeaders = () => [1, 2, 3].map((n) => t('newSheet.column', { n }))
@@ -325,6 +326,15 @@ onBeforeUnmount(() => {
               <SheetIcon class="size-4.5" />
             </span>
             <span class="hidden font-semibold tracking-tight sm:inline">{{ t('app.name') }}</span>
+            <a
+              href="https://github.com/dayth36386/excel-editor/releases"
+              target="_blank"
+              rel="noopener"
+              class="hidden rounded-md border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground transition-colors hover:text-foreground md:inline"
+              :title="t('app.releases')"
+            >
+              v{{ version }}
+            </a>
           </div>
 
           <template v-if="workbook">

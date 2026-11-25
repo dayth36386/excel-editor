@@ -4,6 +4,7 @@ import type en from './en'
 const th: typeof en = {
   app: {
     name: 'Excel Editor',
+    releases: 'ดูบันทึกการอัปเดตบน GitHub',
     title: 'Excel Editor — แก้ไฟล์ .xlsx ในรูปแบบตาราง',
   },
   header: {
