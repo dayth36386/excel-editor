@@ -16,6 +16,7 @@ import {
 } from '@/lib/excel'
 import { evaluateFormula, type Scalar } from '@/lib/formula'
 import { detectLayout } from '@/lib/layout'
+import { writeWorkbook } from '@/lib/saveWorkbook'
 import * as ops from '@/lib/sheetOps'
 import type { LineSnapshot, StyleFrom } from '@/lib/sheetOps'
 import { canSaveAs, downloadBlob, ensureWritable, pickSaveTarget, writeToHandle, XLSX_MIME } from '@/lib/fileAccess'
@@ -583,11 +584,7 @@ export function useWorkbook() {
   // ---- saving ------------------------------------------------------------
 
   async function toBlob(): Promise<Blob> {
-    const wb = workbook.value!
-    // Formulas aren't recalculated here, so ask Excel to do it when it opens the file.
-    wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
-    const buf = await wb.xlsx.writeBuffer()
-    return new Blob([buf], { type: XLSX_MIME })
+    return new Blob([await writeWorkbook(workbook.value!)], { type: XLSX_MIME })
   }
 
   function markSaved() {
