@@ -1,4 +1,5 @@
 import type { Cell, CellFormulaValue, CellSharedFormulaValue, CellValue } from 'exceljs'
+import type { Scalar } from './formula'
 
 export type CellKind = 'text' | 'number' | 'date' | 'boolean'
 
@@ -101,11 +102,30 @@ export function isMergeSlave(cell: Cell): boolean {
 }
 
 /** Table view of a cell, or undefined when it is empty. */
-export function cellData(cell: Cell): CellData | undefined {
+/** Live result of a formula cell, or undefined to fall back to the result cached in the file. */
+export type FormulaResult = (cell: Cell) => Scalar | undefined
+
+// Excel stores dates as days since 1899-12-30.
+const EXCEL_EPOCH = Date.UTC(1899, 11, 30)
+export const dateToSerial = (d: Date) => (d.getTime() - EXCEL_EPOCH) / 86_400_000
+const serialToDate = (n: number) => new Date(EXCEL_EPOCH + Math.round(n * 86_400_000))
+
+/** Whether a number format shows a date or time (so a computed serial number should display as one). */
+function isDateFormat(numFmt?: string): boolean {
+  if (!numFmt) return false
+  const f = numFmt.replace(/"[^"]*"|\[[^\]]*\]|\\./g, '')
+  return /[dmyhs]/i.test(f) && !/[#0]/.test(f.replace(/s\.0+/i, ''))
+}
+
+export function cellData(cell: Cell, formulaResult?: FormulaResult): CellData | undefined {
   if (isMergeSlave(cell)) return undefined
   const raw = cell.value
   const formula = isFormula(raw)
-  const v = formula ? (raw.result as CellValue) : raw
+  let v = formula ? (raw.result as CellValue) : raw
+  if (formula) {
+    const live = formulaResult?.(cell)
+    if (live !== undefined) v = typeof live === 'number' && isDateFormat(cell.numFmt) ? serialToDate(live) : live
+  }
   if (v === null || v === undefined) {
     return formula && 'formula' in raw ? { text: `=${raw.formula}`, sort: '', kind: 'text', formula } : undefined
   }
@@ -221,9 +241,9 @@ function alignOf(cell: Cell, data: CellData | undefined): CellView['align'] {
 }
 
 /** Grid view of a cell (text formatted like Excel shows it), or undefined if there is nothing to draw. */
-export function viewOf(cell: Cell): CellView | undefined {
+export function viewOf(cell: Cell, formulaResult?: FormulaResult): CellView | undefined {
   if (isMergeSlave(cell)) return undefined
-  const data = cellData(cell)
+  const data = cellData(cell, formulaResult)
   const style = cssOf(cell)
   if (!data && !style) return undefined
   return { text: data?.text ?? '', style, align: alignOf(cell, data) }

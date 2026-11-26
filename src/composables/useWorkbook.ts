@@ -1,8 +1,9 @@
 import { computed, markRaw, ref, shallowRef } from 'vue'
-import type { CellValue, Workbook, Worksheet } from 'exceljs'
+import type { Cell, CellValue, Workbook, Worksheet } from 'exceljs'
 import {
   cellData,
   colName,
+  dateToSerial,
   displayText,
   editText,
   isMergeSlave,
@@ -11,7 +12,10 @@ import {
   type CellData,
   type CellKind,
   type CellView,
+  type FormulaResult,
 } from '@/lib/excel'
+import { evaluateFormula, type Scalar } from '@/lib/formula'
+import { detectLayout } from '@/lib/layout'
 import * as ops from '@/lib/sheetOps'
 import type { LineSnapshot, StyleFrom } from '@/lib/sheetOps'
 import { canSaveAs, downloadBlob, ensureWritable, pickSaveTarget, writeToHandle, XLSX_MIME } from '@/lib/fileAccess'
@@ -72,22 +76,6 @@ const key = (c: number) => `c${c}`
 // ExcelJS is ~1 MB, so load it on first use instead of with the page.
 const loadExcelJS = () => import('exceljs').then((m) => m.default)
 
-/** First row with any value is the header; the table spans to the last used row/column. */
-function scan(ws: Worksheet) {
-  let headerRow = 0
-  let lastRow = 0
-  let lastCol = 0
-  ws.eachRow({ includeEmpty: false }, (row, r) => {
-    row.eachCell({ includeEmpty: false }, (cell, c) => {
-      if (isMergeSlave(cell) || displayText(cell.value) === '') return
-      if (!headerRow) headerRow = r
-      lastRow = Math.max(lastRow, r)
-      lastCol = Math.max(lastCol, c)
-    })
-  })
-  return { headerRow: headerRow || 1, lastRow, lastCol }
-}
-
 /**
  * Holds the open workbook and every edit made to it. The ExcelJS workbook is
  * the single source of truth: edits go straight into its cells, so saving keeps
@@ -120,6 +108,52 @@ export function useWorkbook() {
   const touch = () => void revision.value++
   const sheet = (): Worksheet | undefined => workbook.value?.getWorksheet(activeId.value)
 
+  // ---- formulas ------------------------------------------------------------
+  // Common formulas (SUM, AVERAGE, arithmetic…) are computed live from the current values,
+  // so totals update while you edit and files saved without cached results (e.g. by
+  // openpyxl) still show numbers. Results are cached until the next change.
+
+  const formulaCache = new Map<string, Scalar | undefined>()
+  const evaluating = new Set<string>()
+  let formulaCacheRev = -1
+  const clearFormulaCache = () => {
+    formulaCache.clear()
+    formulaCacheRev = revision.value
+  }
+
+  function toScalar(v: CellValue): Scalar {
+    if (v === null || v === undefined) return null
+    if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v
+    if (v instanceof Date) return dateToSerial(v)
+    if ('richText' in v) return v.richText.map((t) => t.text).join('')
+    if ('hyperlink' in v) return typeof v.text === 'string' ? v.text : null
+    if ('error' in v) return String(v.error)
+    return toScalar((v as { result?: CellValue }).result ?? null)
+  }
+
+  function scalarAt(ws: Worksheet, r: number, c: number): Scalar {
+    const cell = ws.findCell(r, c)
+    if (!cell || isMergeSlave(cell)) return null
+    if (cell.formula) return formulaValue(ws, cell) ?? toScalar(cell.value)
+    return toScalar(cell.value)
+  }
+
+  function formulaValue(ws: Worksheet, cell: Cell): Scalar | undefined {
+    const k = cell.address
+    if (formulaCache.has(k)) return formulaCache.get(k)
+    if (evaluating.has(k)) return undefined // circular reference
+    evaluating.add(k)
+    const value = evaluateFormula(cell.formula, (r, c) => scalarAt(ws, r, c), ws.rowCount)
+    evaluating.delete(k)
+    formulaCache.set(k, value)
+    return value
+  }
+
+  const formulaResult: FormulaResult = (cell) => {
+    const ws = sheet()
+    return ws && cell.formula ? formulaValue(ws, cell) : undefined
+  }
+
   const sheets = computed(() => {
     void revision.value
     return workbook.value?.worksheets.map((ws) => ({ id: ws.id, name: ws.name })) ?? []
@@ -129,13 +163,18 @@ export function useWorkbook() {
 
   // ---- building the table ------------------------------------------------
 
+  /** Rows of the table holding formulas; they are re-read whenever any cell changes. */
+  let formulaRows = new Set<number>()
+
   function buildRow(ws: Worksheet, r: number): TableRow {
     const row = ws.findRow(r)
     const cells: TableRow['cells'] = {}
     if (row) {
       for (let c = 1; c <= lastCol; c++) {
         const cell = row.findCell(c)
-        if (cell) cells[key(c)] = cellData(cell)
+        if (!cell) continue
+        cells[key(c)] = cellData(cell, formulaResult)
+        if (cell.formula) formulaRows.add(r)
       }
     }
     return { id: r, cells }
@@ -170,6 +209,12 @@ export function useWorkbook() {
     return [...seen].sort((a, b) => a.localeCompare(b, 'th'))
   }
 
+  /** Header text of column c; a cell merged from the left (part of a wide title) counts as blank. */
+  function headerTitle(ws: Worksheet, c: number): string {
+    const cell = ws.findCell(headerRow.value, c)
+    return cell && !isMergeSlave(cell) ? displayText(cell.value).trim() : ''
+  }
+
   function buildColumn(ws: Worksheet, c: number, list: TableRow[]): TableColumn {
     const k = key(c)
     const kind = guessKind(list, k)
@@ -177,7 +222,7 @@ export function useWorkbook() {
       key: k,
       col: c,
       letter: colName(c),
-      title: displayText(ws.findCell(headerRow.value, c)?.value ?? null).trim(),
+      title: headerTitle(ws, c),
       kind,
       options: kind === 'text' ? categoryOptions(list, k) : undefined,
     }
@@ -186,14 +231,16 @@ export function useWorkbook() {
   function rebuild() {
     const ws = sheet()
     if (!ws) return
-    const s = scan(ws)
-    headerRow.value = s.headerRow
-    lastCol = Math.max(s.lastCol, 1)
-    const lastRow = Math.max(s.lastRow, keepRow, s.headerRow)
-    extent.value = { rows: lastRow, cols: lastCol }
+    clearFormulaCache()
+    formulaRows = new Set()
+    const layout = detectLayout(ws)
+    headerRow.value = layout.headerRow
+    lastCol = Math.max(layout.lastCol, 1)
+    const lastRow = Math.max(layout.lastTableRow, keepRow, layout.headerRow)
+    extent.value = { rows: Math.max(layout.lastRow, lastRow), cols: lastCol }
 
     const list: TableRow[] = []
-    for (let r = s.headerRow + 1; r <= lastRow; r++) list.push(buildRow(ws, r))
+    for (let r = layout.headerRow + 1; r <= lastRow; r++) list.push(buildRow(ws, r))
     rows.value = list
 
     const cols: TableColumn[] = []
@@ -205,7 +252,15 @@ export function useWorkbook() {
   function refreshCell(ws: Worksheet, r: number, c: number) {
     const i = r - headerRow.value - 1
     if (i < 0 || i >= rows.value.length) return rebuild()
-    rows.value = rows.value.with(i, buildRow(ws, r))
+    clearFormulaCache()
+    const next = rows.value.slice()
+    next[i] = buildRow(ws, r)
+    // Totals and other formulas may depend on the cell that changed.
+    for (const fr of formulaRows) {
+      const j = fr - headerRow.value - 1
+      if (fr !== r && j >= 0 && j < next.length) next[j] = buildRow(ws, fr)
+    }
+    rows.value = next
     columns.value = columns.value.map((col) => (col.col === c ? buildColumn(ws, c, rows.value) : col))
   }
 
@@ -319,8 +374,9 @@ export function useWorkbook() {
 
   /** A cell as the Excel view draws it, with its Excel formatting. */
   function gridView(r: number, c: number): CellView | undefined {
+    if (formulaCacheRev !== revision.value) clearFormulaCache()
     const cell = sheet()?.findCell(r, c)
-    return cell ? viewOf(cell) : undefined
+    return cell ? viewOf(cell, formulaResult) : undefined
   }
 
   /** Pixel widths of columns 1..n, from the sheet's column widths. */

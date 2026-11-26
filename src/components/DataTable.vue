@@ -695,9 +695,16 @@ defineExpose({ commit: () => commit(), addRow })
                         <span v-else class="truncate">{{ row.original.cells[col.key]!.text }}</span>
                       </template>
                       <span v-else class="text-muted-foreground/0 group-hover:text-muted-foreground/40">—</span>
+                      <!-- In right-aligned (number/date) columns the badge goes before the value,
+                           so formula results line up with the numbers above them. -->
                       <span
                         v-if="row.original.cells[col.key]?.formula"
-                        class="shrink-0 rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground italic"
+                        :class="
+                          cn(
+                            'shrink-0 rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground italic',
+                            (col.kind === 'number' || col.kind === 'date') && 'order-first',
+                          )
+                        "
                       >
                         fx
                       </span>
