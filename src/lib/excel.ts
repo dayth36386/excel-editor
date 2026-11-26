@@ -40,7 +40,8 @@ export function formatNumber(n: number): string {
   return String(Number(n.toPrecision(15)))
 }
 
-const NUMFMT = /^([^#0?]*?)([#0?,]+)(?:\.([#0?]+))?(%?)([^#0?]*)$/
+// prefix, integer digits, decimals, scaling commas (each one ÷1000, as in #,##0,"k"), percent, suffix
+const NUMFMT = /^([^#0?]*?)([#0?,]*[#0?])(?:\.([#0?]+))?(,*)(%?)([^#0?]*)$/
 
 /**
  * Apply the common Excel number formats: thousands separators, fixed
@@ -54,8 +55,8 @@ export function formatWithNumFmt(n: number, numFmt?: string): string {
     .replace(/"([^"]*)"|\\(.)|\[[^\]]*\]|_.|\*./g, (_, quoted?: string, escaped?: string) => quoted ?? escaped ?? '')
   const m = NUMFMT.exec(section)
   if (!m) return formatNumber(n)
-  const [, prefix, int, dec = '', pct, suffix] = m
-  const value = pct ? n * 100 : n
+  const [, prefix, int, dec = '', scaling, pct, suffix] = m
+  const value = (pct ? n * 100 : n) / 1000 ** scaling.length
   const digits = new Intl.NumberFormat('en-US', {
     minimumIntegerDigits: Math.max(1, (int.match(/0/g) ?? []).length),
     minimumFractionDigits: (dec.match(/0/g) ?? []).length,

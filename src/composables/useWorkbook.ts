@@ -212,9 +212,9 @@ export function useWorkbook() {
   // ---- loading -----------------------------------------------------------
 
   async function load(data: ArrayBuffer, name: string, handle: FileSystemFileHandle | null = null) {
-    const ExcelJS = await loadExcelJS()
+    const [ExcelJS, { normalizeXlsx }] = await Promise.all([loadExcelJS(), import('@/lib/normalizeXlsx')])
     const wb = new ExcelJS.Workbook()
-    await wb.xlsx.load(data)
+    await wb.xlsx.load(normalizeXlsx(data))
     if (!wb.worksheets.length) wb.addWorksheet('Sheet1')
     reset(wb, name, handle)
   }

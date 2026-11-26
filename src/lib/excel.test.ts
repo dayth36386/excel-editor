@@ -125,6 +125,12 @@ describe('formatWithNumFmt', () => {
     expect(formatWithNumFmt(3.5, 'General')).toBe('3.5')
     expect(formatWithNumFmt(3.5, '0.00E+00')).toBe('3.5')
   })
+
+  it('scales by 1000 for each trailing comma', () => {
+    expect(formatWithNumFmt(166000, '#,##0,"k"')).toBe('166k')
+    expect(formatWithNumFmt(1234567, '#,##0,"k"')).toBe('1,235k')
+    expect(formatWithNumFmt(2500000, '0.0,,"M"')).toBe('2.5M')
+  })
 })
 
 describe('compareSort', () => {
